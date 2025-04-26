@@ -44,11 +44,11 @@ def list_files():
     files = results.get('files', [])
     return files
 
-@app.get("/download/{file_id}")
+@app.get("/download")
 def download_file(file_id: str):
     """Download a file from Google Drive by its file ID."""
     request = drive_service.files().get_media(fileId=file_id)
-    
+
     # Create a temporary file to download into
     temp_file = tempfile.NamedTemporaryFile(delete=False)
     downloader = MediaIoBaseDownload(temp_file, request)
@@ -57,9 +57,9 @@ def download_file(file_id: str):
         status, done = downloader.next_chunk()
     temp_file.flush()
     temp_file.seek(0)
-    
+
     # Fetch the filename
     file_metadata = drive_service.files().get(fileId=file_id, fields="name").execute()
     filename = file_metadata.get("name", "downloaded_file")
-    
+
     return FileResponse(temp_file.name, media_type='application/octet-stream', filename=filename)
