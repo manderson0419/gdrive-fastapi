@@ -1,23 +1,28 @@
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse  # <-- New import
+from fastapi.responses import StreamingResponse, FileResponse
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload  # <-- Needed for download
+from googleapiclient.http import MediaIoBaseDownload
 from typing import List
-import io  # <-- New import
+import io
 import os
+import tempfile
+import json
 
 app = FastAPI()
 
 # === SETTINGS ===
-SERVICE_ACCOUNT_FILE = '/Users/michaelaanderson/Downloads/tidy-centaur-457916-h9-2230742befee.json'
-FOLDER_ID = '1VsWkYlSJSFWHRK6u66qKhUn9xqajMPd6'
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
-# === INITIALIZE GOOGLE DRIVE CLIENT ===
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+# Load service account credentials from environment variable
+service_account_info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
+credentials = service_account.Credentials.from_service_account_info(
+    service_account_info, scopes=SCOPES
 )
+
+FOLDER_ID = '1VsWkYlSJSFWHRK6u66qKhUn9xqajMPd6'  # <-- Your Google Drive Folder ID
+
+# === INITIALIZE GOOGLE DRIVE CLIENT ===
 drive_service = build('drive', 'v3', credentials=credentials)
 
 @app.get("/")
@@ -39,9 +44,6 @@ def list_files():
     files = results.get('files', [])
     return files
 
-from fastapi.responses import FileResponse
-import tempfile
-
 @app.get("/download/{file_id}")
 def download_file(file_id: str):
     """Download a file from Google Drive by its file ID."""
@@ -49,17 +51,16 @@ def download_file(file_id: str):
     
     # Create a temporary file to download into
     temp_file = tempfile.NamedTemporaryFile(delete=False)
-    
     downloader = MediaIoBaseDownload(temp_file, request)
     done = False
     while not done:
         status, done = downloader.next_chunk()
-    
     temp_file.flush()
     temp_file.seek(0)
     
     # Fetch the filename
     file_metadata = drive_service.files().get(fileId=file_id, fields="name").execute()
     filename = file_metadata.get("name", "downloaded_file")
-
+    
     return FileResponse(temp_file.name, media_type='application/octet-stream', filename=filename)
+
