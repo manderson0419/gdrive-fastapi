@@ -63,3 +63,8 @@ def download_file(file_id: str):
     filename = file_metadata.get("name", "downloaded_file")
 
     return FileResponse(temp_file.name, media_type='application/octet-stream', filename=filename)
+
+@app.get("/openapi.json")
+async def get_openapi():
+    """Serve the static OpenAPI schema."""
+    return FileResponse("openapi.json")
