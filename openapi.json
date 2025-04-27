@@ -1,0 +1,8 @@
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+
+app = FastAPI()
+
+@app.get("/openapi.json")
+def get_openapi():
+    return FileResponse("openapi.json")
