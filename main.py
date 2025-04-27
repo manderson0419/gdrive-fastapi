@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -45,26 +45,23 @@ def list_files():
     return files
 
 @app.get("/download")
-def download_file(file_id: str):
-    """Download a file from Google Drive by its file ID."""
+async def download_file(file_id: str):
+    """Download a file from Google Drive by its file ID and stream it back."""
     request = drive_service.files().get_media(fileId=file_id)
 
-    # Create a temporary file to download into
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    downloader = MediaIoBaseDownload(temp_file, request)
+    # Create an in-memory bytes buffer instead of a temp file
+    memory_file = io.BytesIO()
+    downloader = MediaIoBaseDownload(memory_file, request)
     done = False
     while not done:
         status, done = downloader.next_chunk()
-    temp_file.flush()
-    temp_file.seek(0)
+
+    memory_file.seek(0)  # Reset pointer to beginning
 
     # Fetch the filename
     file_metadata = drive_service.files().get(fileId=file_id, fields="name").execute()
     filename = file_metadata.get("name", "downloaded_file")
 
-    return FileResponse(temp_file.name, media_type='application/octet-stream', filename=filename)
-
-@app.get("/openapi.json")
-async def get_openapi():
-    """Serve the static OpenAPI schema."""
-    return FileResponse("openapi.json")
+    return StreamingResponse(
+        memory_file,
+        media_type="application/octet-stream",
